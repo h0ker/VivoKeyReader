@@ -1,82 +1,123 @@
 package com.vivokey.vivokeyreader.presentation
 
 import android.annotation.SuppressLint
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.animation.graphics.ExperimentalAnimationGraphicsApi
+import androidx.compose.animation.graphics.res.animatedVectorResource
+import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
+import androidx.compose.animation.graphics.vector.AnimatedImageVector
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.Scaffold
-import androidx.compose.material.Surface
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.Icon
+import androidx.compose.material.Text
+import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.vivokey.lib_bluetooth.domain.models.ConnectionStatus
-import com.vivokey.vivokeyreader.presentation.components.HostSelection
-import com.vivokey.vivokeyreader.presentation.components.TestConsole
-import com.vivokey.vivokeyreader.presentation.components.TitleText
+import com.vivokey.vivokeyreader.presentation.components.AnimatedScanIcon
+import com.vivokey.vivokeyreader.presentation.components.SelectedHostStatus
+import com.vivokey.vivokeyreader.presentation.components.ThreeCompartmentLayout
+import com.vivokey.vivokeyreader.presentation.components.TwoButtonRow
 import com.vivokey.vivokeyreader.ui.theme.VivoKeyReaderTheme
+import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalAnimationGraphicsApi::class)
 @SuppressLint("MissingPermission")
 @Composable
-fun VivoKeyReader(viewModel: VivoKeyReaderViewModel) {
+fun VivoKeyReader(
+    viewModel: VivoKeyReaderViewModel = hiltViewModel()
+) {
 
     VivoKeyReaderTheme {
 
-        Scaffold(
-            modifier = Modifier
-        ) { paddingValues ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush = Brush.linearGradient(
-                            listOf(
-                                Color.Yellow,
-                                Color.Magenta,
-                            )
-                        )
-                    )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(paddingValues)
-                        .fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    HostSelection(
-                        showHostSelection = viewModel.showHostSelection,
-                        pairedHostList = viewModel.pairedDeviceList.collectAsState().value,
-                        discoveredHostList = viewModel.scannedDeviceList.collectAsState().value,
-                        selectedHost = viewModel.selectedDevice,
-                        onHostStatusClicked = {
-                            viewModel.resetHostConnection()
-                        },
-                        onHostSelected = { host ->
-                            viewModel.onHostSelected(host)
-                        },
-                        connectionStatus = viewModel.connectionStatus.collectAsState().value
-                    )
-                    TestConsole(
-                        showTestConsole = viewModel.connectionStatus.collectAsState().value == ConnectionStatus.CONNECTED,
-                        inputStreamText = viewModel.inputStreamText,
-                        outputStreamText = viewModel.outputStreamText,
-                        sendMessage = {
-                            viewModel.sendMessage(it)
-                        }
-                    )
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = Color.Black
-                    ) {}
-                }
+        LaunchedEffect(viewModel.connectionStatus.collectAsState().value) {
+            if(viewModel.connectionStatus.value == ConnectionStatus.CONNECTED) {
+                viewModel.stopColorAnimation()
             }
         }
+
+        ThreeCompartmentLayout(
+            showCompartment1 = viewModel.showSection1,
+            showCompartment2 = viewModel.showSection2,
+            showCompartment3 = viewModel.showSection3,
+            compartment1 = {
+                Text(
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(16.dp),
+                    text = if(viewModel.connectionStatus.collectAsState().value != ConnectionStatus.CONNECTED) "Scan your Apex" else "Uplink established",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 24.sp,
+                    color = Color.DarkGray
+                )
+            },
+            compartment2 = {
+                if(viewModel.connectionStatus.collectAsState().value != ConnectionStatus.DISCONNECTED) {
+                    SelectedHostStatus(
+                        modifier = Modifier.statusBarsPadding(),
+                        selectedHost = viewModel.selectedDevice,
+                        connectionStatus = viewModel.connectionStatus.collectAsState().value
+                    )
+                } else {
+                    AnimatedScanIcon()
+                }
+            },
+            compartment3 = {
+                if(viewModel.connectionStatus.collectAsState().value == ConnectionStatus.DISCONNECTED) {
+                    TwoButtonRow(
+                        buttonOneClicked = {
+                            viewModel.startColorAnimation()
+                        },
+                        buttonTwoClicked = {
+                            viewModel.stopColorAnimation()
+                        }
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    ) {
+                        LazyColumn {
+                            item {
+                                Column() {
+                                    Text(
+                                        text = "Total length: ${viewModel.inputBytes.size}",
+                                        color = Color.Black
+                                    )
+                                    Text(
+                                        text = viewModel.inputBytes.toHex(),
+                                        color = Color.Black
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            colorGradientAngle = viewModel.colorGradientAngle
+        )
     }
 }
+
+fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }

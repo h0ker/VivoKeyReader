@@ -1,6 +1,8 @@
 package com.vivokey.vivokeyreader.presentation.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -8,9 +10,11 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,7 +29,7 @@ import com.vivokey.vivokeyreader.presentation.paths.RoundedCornerPaths
 @Composable
 fun SlidingVisibilityContent(
     modifier: Modifier = Modifier,
-    showContent: Boolean,
+    showContent: MutableTransitionState<Boolean>,
     content: @Composable () -> Unit
 ) {
     Box(
@@ -45,31 +49,42 @@ fun SlidingVisibilityContent(
             }
             .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
     ) {
-        AnimatedVisibility(
-            visible = showContent,
-            enter = expandVertically(
-                tween(
-                    durationMillis = 600
-                )
-            ),
-            exit = shrinkVertically(
-                tween(
-                    durationMillis = 600
-                )
-            )
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            content.invoke()
+            AnimatedVisibility(
+                modifier = Modifier
+                    .animateContentSize(
+                        animationSpec = tween(
+                            durationMillis = 400,
+                            easing = LinearOutSlowInEasing
+                        )
+                    )
+                    .fillMaxWidth(),
+                visibleState = showContent,
+                enter = expandVertically(
+                    tween(
+                        durationMillis = 400
+                    )
+                ),
+                exit = shrinkVertically(
+                    tween(
+                        durationMillis = 400
+                    )
+                )
+            ) {
+                content.invoke()
+            }
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 31.dp)
+            ) {
+                RoundedCornerPaths.bottomCorners(
+                    this,
+                    height = 32.dp.toPx()
+                )
+            }
         }
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-        ) {
-            RoundedCornerPaths.bottomCorners(
-                this,
-                height = 32.dp.toPx()
-            )
-        }
-
     }
 }

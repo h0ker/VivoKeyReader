@@ -12,22 +12,20 @@ import java.io.IOException
 class BluetoothDataTransferService(
     private val socket: BluetoothSocket
 ) {
-    fun listenForIncomingMessages(): Flow<String?> {
+    fun listenForIncomingMessages(): Flow<ByteArray?> {
         return flow {
             if(!socket.isConnected) {
                 return@flow
             }
             val buffer = ByteArray(1024)
+            var readBytes = 0
             while(true) {
-                val byteCount = try {
-                    socket.inputStream.read(buffer)
+                try {
+                    readBytes = socket.inputStream.read(buffer)
                 } catch(e: IOException) {
                     return@flow
                 }
-
-                emit(
-                    String(buffer, 0, byteCount)
-                )
+                emit(buffer.copyOfRange(0, readBytes))
             }
         }.flowOn(Dispatchers.IO)
     }

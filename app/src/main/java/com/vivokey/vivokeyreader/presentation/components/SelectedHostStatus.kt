@@ -38,12 +38,12 @@ fun SelectedHostStatus(
         ) {
             Text(
                 text = selectedHost?.name ?: "Unknown",
-                color = Color.Black,
+                color = Color.DarkGray,
                 fontSize = 24.sp
             )
             Text(
                 text = selectedHost?.address ?: "",
-                color = Color.Black,
+                color = Color.DarkGray,
                 fontSize = 16.sp
             )
         }
@@ -63,7 +63,7 @@ fun SelectedHostStatus(
                         )
                         Text(
                             text = "Disconnected",
-                            color = Color.Black,
+                            color = Color.DarkGray,
                             fontSize = 12.sp
                         )
                     }
@@ -82,7 +82,7 @@ fun SelectedHostStatus(
                         )
                         Text(
                             text = "Connected",
-                            color = Color.Black,
+                            color = Color.DarkGray,
                             fontSize = 12.sp
                         )
                     }
@@ -97,12 +97,12 @@ fun SelectedHostStatus(
                             modifier = Modifier.size(16.dp)
                         ) {
                             CircularProgressIndicator(
-                                color = Color.Black
+                                color = Color.DarkGray
                             )
                         }
                         Text(
                             text = "Connecting",
-                            color = Color.Black,
+                            color = Color.DarkGray,
                             fontSize = 12.sp
                         )
                     }

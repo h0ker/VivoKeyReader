@@ -60,7 +60,7 @@ fun RoundedCorners(
                     close()
                 }
 
-                drawPath(path, Color.Black)
+                drawPath(path, Color.DarkGray)
             }
         }
     }
@@ -95,7 +95,7 @@ fun RoundedCorners(
                     close()
                 }
 
-                drawPath(path, Color.Black)
+                drawPath(path, Color.DarkGray)
             }
 
             Canvas(
@@ -120,7 +120,7 @@ fun RoundedCorners(
                     close()
                 }
 
-                drawPath(path, Color.Black)
+                drawPath(path, Color.DarkGray)
             }
         }
     }

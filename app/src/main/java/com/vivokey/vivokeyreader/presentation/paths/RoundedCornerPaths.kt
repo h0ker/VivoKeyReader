@@ -32,7 +32,7 @@ class RoundedCornerPaths {
                 lineTo(0f, height)
                 close()
             }
-            drawScope.drawPath(leftTopCornerPath, Color.Black)
+            drawScope.drawPath(leftTopCornerPath, Color.DarkGray)
         }
 
         fun topRightInvertedCorner(
@@ -57,7 +57,7 @@ class RoundedCornerPaths {
                 close()
             }
 
-            drawScope.drawPath(path, Color.Black)
+            drawScope.drawPath(path, Color.DarkGray)
         }
 
         fun bottomCorners(
@@ -92,7 +92,7 @@ class RoundedCornerPaths {
                 close()
             }
 
-            drawScope.drawPath(path, Color.Black)
+            drawScope.drawPath(path, Color.DarkGray)
         }
     }
 }

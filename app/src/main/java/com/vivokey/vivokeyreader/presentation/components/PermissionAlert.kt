@@ -19,7 +19,7 @@ fun PermissionAlert(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Black)
+            .background(Color.DarkGray)
     ) {
         Text(
             modifier = Modifier.statusBarsPadding(),
@@ -38,7 +38,7 @@ fun PermissionAlert(
         ) {
             Text(
                 text = "Enable Permissions",
-                color = Color.Black,
+                color = Color.DarkGray,
                 fontSize = 12.sp
             )
         }

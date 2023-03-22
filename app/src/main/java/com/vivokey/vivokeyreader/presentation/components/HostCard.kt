@@ -24,7 +24,7 @@ fun HostCard(
                 onSelected.invoke()
             }
             .padding(8.dp),
-        backgroundColor = Color.Black,
+        backgroundColor = Color.DarkGray,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),

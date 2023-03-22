@@ -27,7 +27,7 @@ import com.vivokey.lib_bluetooth.domain.models.Host
 @SuppressLint("MissingPermission")
 @Composable
 fun HostSelection(
-    showHostSelection: Boolean,
+    showHostSelection: MutableTransitionState<Boolean>,
     pairedHostList: List<Host?>,
     discoveredHostList: List<Host?>,
     selectedHost: Host?,
@@ -58,7 +58,7 @@ fun HostSelection(
                             modifier = Modifier.padding(start = 8.dp),
                             text = "Paired Hosts:",
                             fontSize = 42.sp,
-                            color = Color.Black
+                            color = Color.DarkGray
                         )
                     }
                     items(pairedHostList) { host ->
@@ -73,7 +73,7 @@ fun HostSelection(
                             modifier = Modifier.padding(start = 8.dp),
                             text = "Discovered Hosts:",
                             fontSize = 42.sp,
-                            color = Color.Black
+                            color = Color.DarkGray
                         )
                     }
                     items(discoveredHostList) { host ->

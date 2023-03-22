@@ -42,10 +42,6 @@ class AndroidBluetoothController (
 
     private var dataTransferService: BluetoothDataTransferService? = null
 
-    private val _scannedDevices = MutableStateFlow<List<Host>>(emptyList())
-    override val scannedDevices: StateFlow<List<Host>>
-        get() = _scannedDevices.asStateFlow()
-
     private val _pairedDevices = MutableStateFlow<List<Host>>(emptyList())
     override val pairedDevices: StateFlow<List<Host>>
         get() = _pairedDevices.asStateFlow()
@@ -55,13 +51,6 @@ class AndroidBluetoothController (
         get() = _connectionStatus.asStateFlow()
 
     private var _socket: BluetoothSocket? = null
-
-    private val foundDeviceReceiver = FoundDeviceReceiver { device ->
-        _scannedDevices.update { devices ->
-            val newDevice = device.toHost()
-            if(newDevice in devices) devices else devices + newDevice
-        }
-    }
 
     init {
         updatePairedDevices()
@@ -74,40 +63,13 @@ class AndroidBluetoothController (
         return dataTransferService?.sendMessage(message) ?: false
     }
 
-    override fun startDiscovery() {
-        if(!hasPermission(Manifest.permission.BLUETOOTH_SCAN)) {
-            return
-        }
-
-        context.registerReceiver(
-            foundDeviceReceiver,
-            IntentFilter(BluetoothDevice.ACTION_FOUND)
-        )
-
-        updatePairedDevices()
-
-        bluetoothAdapter?.startDiscovery()
-    }
-
-    override fun stopDiscovery() {
-        if(!hasPermission(Manifest.permission.BLUETOOTH_SCAN)) {
-            return
-        }
-
-        bluetoothAdapter?.cancelDiscovery()
-    }
-
-    override fun release() {
-        context.unregisterReceiver(foundDeviceReceiver)
-    }
-
     override fun killConnection() {
         _connectionStatus.update { ConnectionStatus.DISCONNECTED }
         _socket?.close()
         _socket = null
     }
 
-    override fun connectOverSPP(host: Host): Flow<String?> {
+    override fun connectOverSPP(host: Host): Flow<ByteArray?> {
         _connectionStatus.update { ConnectionStatus.CONNECTING }
         return flow {
             host.address.let {

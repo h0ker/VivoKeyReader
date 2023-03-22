@@ -21,7 +21,7 @@ fun TitleText(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Black),
+            .background(Color.DarkGray),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(

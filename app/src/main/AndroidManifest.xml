@@ -8,6 +8,8 @@
         android:usesPermissionFlags="neverForLocation"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-feature android:name="android.hardware.bluetooth" />
+    <uses-feature android:name="android.hardware.nfc" />
+    <uses-permission android:name="android.permission.NFC" />
 
     <application
         android:name="com.vivokey.vivokeyreader.VivoKeyReaderApplication"
