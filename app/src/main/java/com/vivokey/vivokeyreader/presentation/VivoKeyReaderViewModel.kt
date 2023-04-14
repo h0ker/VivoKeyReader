@@ -141,6 +141,9 @@ class VivoKeyReaderViewModel @Inject constructor(
                 VPCD_CTRL_ATR -> {
                     try {
                         val atr = apexController.getATR()
+                        if(atr == null) {
+                            killConnections()
+                        }
                         atr?.let {
                             bluetoothController.trySendMessage(it)
                             _messageLog.value += Message(it, MessageType.SENT)

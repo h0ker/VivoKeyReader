@@ -7,7 +7,9 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.vivokey.lib_bluetooth.domain.models.BluetoothController
 import com.vivokey.lib_bluetooth.domain.models.BluetoothDataTransferService
 import com.vivokey.lib_bluetooth.domain.models.ConnectionStatus
@@ -68,6 +70,7 @@ class AndroidBluetoothController (
         _dataTransferService = null
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override suspend fun connectOverSPP(host: Host): Flow<ByteArray?> {
         Log.i("connectOverSPP():", host.name ?: "No Host")
         _connectionStatus.update { ConnectionStatus.CONNECTING }
@@ -77,7 +80,7 @@ class AndroidBluetoothController (
                 if (BluetoothAdapter.checkBluetoothAddress(it)) {
                     val bluetoothDevice = bluetoothAdapter?.getRemoteDevice(it)
                     val socket =
-                        bluetoothDevice?.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
+                        bluetoothDevice?.createRfcommSocketToServiceRecord(SPP_UUID)
                     if (socket != null) {
                         try {
                             socket.connect()

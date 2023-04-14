@@ -2,7 +2,9 @@ package com.vivokey.lib_bluetooth.domain.models
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothSocket
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -13,7 +15,7 @@ import java.io.IOException
 class BluetoothDataTransferService(
     private val socket: BluetoothSocket
 ) {
-    @SuppressLint("NewApi")
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     fun listenForIncomingMessages(): Flow<ByteArray?> {
         return flow {
             if(!socket.isConnected) {
@@ -22,10 +24,12 @@ class BluetoothDataTransferService(
             while(true) {
                 val buffer = ByteArray(1024)
                 try {
-                    val lengthBytes = ByteArray(2)
-                    socket.inputStream.readNBytes(lengthBytes, 0, 2)
-                    val length = lengthBytes[1].toInt() + lengthBytes[0].toInt()
-
+                    val length1 = socket.inputStream.read()
+                    val length2 = socket.inputStream.read()
+                    if(length1 < 0 || length2 < 0) {
+                        throw(IOException())
+                    }
+                    val length = length1 shl 8 or length2
                     socket.inputStream.readNBytes(buffer, 0, length)
                     emit(buffer.copyOfRange(0, length))
                 } catch(e: IOException) {
