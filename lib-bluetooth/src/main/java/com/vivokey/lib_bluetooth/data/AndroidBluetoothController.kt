@@ -3,12 +3,11 @@ package com.vivokey.lib_bluetooth.data
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
-import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.util.Log
 import com.vivokey.lib_bluetooth.domain.models.BluetoothController
 import com.vivokey.lib_bluetooth.domain.models.BluetoothDataTransferService
 import com.vivokey.lib_bluetooth.domain.models.ConnectionStatus
@@ -20,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
-import java.net.Socket
+import org.apache.commons.codec.binary.Hex
 import java.util.UUID
 
 @SuppressLint("MissingPermission")
@@ -40,7 +39,7 @@ class AndroidBluetoothController (
         bluetoothManager?.adapter
     }
 
-    private var dataTransferService: BluetoothDataTransferService? = null
+    private var _dataTransferService: BluetoothDataTransferService? = null
 
     private val _pairedDevices = MutableStateFlow<List<Host>>(emptyList())
     override val pairedDevices: StateFlow<List<Host>>
@@ -56,22 +55,24 @@ class AndroidBluetoothController (
         updatePairedDevices()
     }
 
-    override suspend fun trySendMessage(message: String): Boolean {
-        if(dataTransferService == null) {
-            return true
-        }
-        return dataTransferService?.sendMessage(message) ?: false
+    override suspend fun trySendMessage(message: ByteArray) {
+        Log.i("trySendMessage():", Hex.encodeHexString(message))
+        _dataTransferService?.sendMessage(message)
     }
 
     override fun killConnection() {
+        Log.i("killConnection():", "Killing Bluetooth Connection")
         _connectionStatus.update { ConnectionStatus.DISCONNECTED }
         _socket?.close()
         _socket = null
+        _dataTransferService = null
     }
 
-    override fun connectOverSPP(host: Host): Flow<ByteArray?> {
+    override suspend fun connectOverSPP(host: Host): Flow<ByteArray?> {
+        Log.i("connectOverSPP():", host.name ?: "No Host")
         _connectionStatus.update { ConnectionStatus.CONNECTING }
         return flow {
+
             host.address.let {
                 if (BluetoothAdapter.checkBluetoothAddress(it)) {
                     val bluetoothDevice = bluetoothAdapter?.getRemoteDevice(it)
@@ -82,18 +83,15 @@ class AndroidBluetoothController (
                             socket.connect()
                             _socket = socket
                             _connectionStatus.update { ConnectionStatus.CONNECTED }
-                            dataTransferService = BluetoothDataTransferService(socket)
-                            emitAll(dataTransferService!!.listenForIncomingMessages())
-                            _connectionStatus.update { ConnectionStatus.DISCONNECTED }
+                            _dataTransferService = BluetoothDataTransferService(socket)
+                            _dataTransferService?.let { transferService ->
+                                emitAll(transferService.listenForIncomingMessages())
+                            }
                         } catch (e: Exception) {
-                            println(e)
+                            Log.i("connectOverSPP():", e.message ?: e.toString())
                             _connectionStatus.update { ConnectionStatus.DISCONNECTED }
                         }
-                    } else {
-                        _connectionStatus.update { ConnectionStatus.DISCONNECTED }
                     }
-                } else {
-                    _connectionStatus.update { ConnectionStatus.DISCONNECTED }
                 }
             }
         }

@@ -34,6 +34,7 @@ class VivoKeyReaderActivity : NfcActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val enableBluetoothLauncher = registerForActivityResult(
@@ -51,15 +52,22 @@ class VivoKeyReaderActivity : NfcActivity() {
                 )
             }
         }
-
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                )
+        val permissionsToRequest = if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.BLUETOOTH_PRIVILEGED
             )
         }
+        permissionLauncher.launch(permissionsToRequest)
 
         setContent {
             VivoKeyReaderTheme {
@@ -83,5 +91,9 @@ class VivoKeyReaderActivity : NfcActivity() {
         tag?.let {
             (viewModel as NfcViewModel).onTagScan(tag)
         }
+    }
+
+    override fun onBackPressed() {
+        viewModel.onBack()
     }
 }

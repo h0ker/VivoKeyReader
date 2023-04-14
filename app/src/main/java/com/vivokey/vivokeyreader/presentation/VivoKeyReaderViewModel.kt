@@ -2,7 +2,7 @@ package com.vivokey.vivokeyreader.presentation
 
 import android.annotation.SuppressLint
 import android.nfc.Tag
-import android.os.CountDownTimer
+import android.util.Log
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +11,10 @@ import androidx.lifecycle.viewModelScope
 import com.vivokey.lib_bluetooth.domain.models.BluetoothController
 import com.vivokey.lib_bluetooth.domain.models.ConnectionStatus
 import com.vivokey.lib_bluetooth.domain.models.Host
+import com.vivokey.lib_bluetooth.domain.models.Message
+import com.vivokey.lib_bluetooth.domain.models.MessageType
+import com.vivokey.lib_nfc.domain.ApexController
+import com.vivokey.lib_nfc.domain.IsodepConnectionStatus
 import com.vivokey.lib_nfc.domain.NfcViewModel
 import com.vivokey.vivokeyreader.domain.models.Timer
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,34 +26,40 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.apache.commons.codec.binary.Hex
+import java.io.IOException
+import java.lang.Exception
 import javax.inject.Inject
 
 @SuppressLint("MissingPermission")
 @HiltViewModel
 class VivoKeyReaderViewModel @Inject constructor(
+    private val apexController: ApexController,
     private val bluetoothController: BluetoothController,
     private val timer: Timer
 ): NfcViewModel, ViewModel() {
 
+    companion object {
+        private const val VPCD_CTRL_LEN: Byte = 1
+        private const val VPCD_CTRL_OFF: Byte = 0
+        private const val VPCD_CTRL_ON: Byte = 1
+        private const val VPCD_CTRL_RESET: Byte = 2
+        private const val VPCD_CTRL_ATR: Byte = 4
+    }
+
     private val pairedDeviceList: StateFlow<List<Host>>
         get() { return bluetoothController.pairedDevices }
 
-    val connectionStatus: StateFlow<ConnectionStatus>
+    val bluetoothConnectionStatus: StateFlow<ConnectionStatus>
         get() { return bluetoothController.connectionStatus }
 
     private val _selectedDevice: MutableState<Host?> = mutableStateOf(null)
     val selectedDevice: Host?
         get() { return _selectedDevice.value }
     
-    private val _inputBytes: MutableState<ByteArray> = mutableStateOf(byteArrayOf())
-    var inputBytes: ByteArray
-        get() { return _inputBytes.value }
-        set(value) { _inputBytes.value = value }
-
-    private val _outputStreamText: MutableState<String?> = mutableStateOf(null)
-    var outputStreamText: String?
-        get() { return _outputStreamText.value }
-        set(value) { _outputStreamText.value = value }
+    private val _messageLog: MutableState<List<Message?>> = mutableStateOf(listOf())
+    val messageLog: List<Message?>
+        get() { return _messageLog.value }
 
     var showSection1 = MutableTransitionState(false)
 
@@ -74,40 +84,19 @@ class VivoKeyReaderViewModel @Inject constructor(
         }
     }
 
-    fun resetHostConnection() {
-        _selectedDevice.value = null
-        bluetoothController.killConnection()
-    }
-
-    fun sendMessage(message: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            if(bluetoothController.trySendMessage(message)) {
-                //change this to = message if sending the whole thing and not just a character
-                _outputStreamText.value += message
-            }
-        }
-    }
-
-    fun onHostSelected(host: Host) {
-        _selectedDevice.value = host
-        viewModelScope.launch(Dispatchers.IO) {
-            bluetoothController.connectOverSPP(host).listen()
-        }
-    }
-
     private fun Flow<ByteArray?>.listen(): Job {
-        return onEach { result ->
-            println("TEST")
-            if (result != null) {
-                _inputBytes.value += result
+        return onEach { message ->
+            if (message != null) {
+                _messageLog.value += Message(message, MessageType.RECEIVED)
+                handleMessage(message)
             }
         }.launchIn(viewModelScope)
     }
 
-    fun startColorAnimation() {
+    private fun startColorAnimation() {
         if(timerJob == null) {
             timerJob = timer.getTimer(repeatMillis = 1) {
-                _colorGradientAngle.value += 1
+                _colorGradientAngle.value += .5f
             }
         }
         timerJob?.let {
@@ -116,42 +105,79 @@ class VivoKeyReaderViewModel @Inject constructor(
             }
             else {
                 timerJob = timer.getTimer(repeatMillis = 1) {
-                    _colorGradientAngle.value += 1
+                    _colorGradientAngle.value += .5f
                 }
             }
         }
     }
 
     //TODO: Fix this shit
+    //TODO: Discuss Room usage here instead of paired device fetch
     private suspend fun attemptBluetoothConnection() {
         viewModelScope.launch(Dispatchers.IO) {
             for(host: Host in pairedDeviceList.value) {
                 _selectedDevice.value = host
                 bluetoothController.connectOverSPP(host).listen()
-
-                var delayTotal: Long = 1000
-                if(connectionStatus.value != ConnectionStatus.CONNECTED) {
-                    while (delayTotal < 4000) {
-                        delay(delayTotal)
-                        delayTotal += 1000
-                    }
-                    continue
-                } else {
-                    break
-                }
             }
         }
     }
 
-    fun stopColorAnimation() {
+    private fun stopColorAnimation() {
         timerJob?.cancel()
+    }
+
+    private fun killConnections() {
+        stopColorAnimation()
+        _messageLog.value = listOf()
+        _selectedDevice.value = null
+        bluetoothController.killConnection()
+        apexController.close()
+    }
+
+    private suspend fun handleMessage(message: ByteArray) {
+        //CTL byte check
+        if(message.size == 1) {
+            when(message.first()) {
+                VPCD_CTRL_ATR -> {
+                    try {
+                        val atr = apexController.getATR()
+                        atr?.let {
+                            bluetoothController.trySendMessage(it)
+                            _messageLog.value += Message(it, MessageType.SENT)
+                        }
+                    } catch(e: Exception) {
+                        Log.i("handleMessage() - ATR", e.message ?: e.toString())
+                        killConnections()
+                    }
+                }
+            }
+        } else { //APDU
+            try {
+                if(message.isNotEmpty()) {
+                    val response = apexController.transceive(message)
+                    bluetoothController.trySendMessage(response)
+                    _messageLog.value += Message(response, MessageType.SENT)
+                }
+            } catch(e: Exception) {
+                Log.i("handleMessage() - APDU", e.message ?: e.toString())
+                killConnections()
+            }
+        }
     }
 
     override fun onTagScan(tag: Tag) {
         viewModelScope.launch(Dispatchers.IO) {
             startColorAnimation()
             attemptBluetoothConnection()
+            apexController.connect(tag)
+        }
+    }
+
+    fun onBack() {
+        if(_selectedDevice.value != null) {
             stopColorAnimation()
+            _selectedDevice.value = null
+            bluetoothController.killConnection()
         }
     }
 }

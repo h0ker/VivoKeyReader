@@ -1,5 +1,6 @@
 package com.vivokey.lib_bluetooth.domain.models
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothSocket
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -12,33 +13,35 @@ import java.io.IOException
 class BluetoothDataTransferService(
     private val socket: BluetoothSocket
 ) {
+    @SuppressLint("NewApi")
     fun listenForIncomingMessages(): Flow<ByteArray?> {
         return flow {
             if(!socket.isConnected) {
                 return@flow
             }
-            val buffer = ByteArray(1024)
-            var readBytes = 0
             while(true) {
+                val buffer = ByteArray(1024)
                 try {
-                    readBytes = socket.inputStream.read(buffer)
+                    val lengthBytes = ByteArray(2)
+                    socket.inputStream.readNBytes(lengthBytes, 0, 2)
+                    val length = lengthBytes[1].toInt() + lengthBytes[0].toInt()
+
+                    socket.inputStream.readNBytes(buffer, 0, length)
+                    emit(buffer.copyOfRange(0, length))
                 } catch(e: IOException) {
+                    Log.i("listenForIncomingMessages()", e.message ?: e.toString())
                     return@flow
                 }
-                emit(buffer.copyOfRange(0, readBytes))
             }
         }.flowOn(Dispatchers.IO)
     }
 
-    suspend fun sendMessage(message: String): Boolean {
-        val messageBytes = message.toByteArray()
-        return withContext(Dispatchers.IO) {
-            try {
-                socket.outputStream.write(messageBytes)
-            } catch(e: Exception) {
-                return@withContext false
-            }
-            true
-        }
+    fun sendMessage(data: ByteArray) {
+        val packet = ByteArray(2 + data.size)
+        packet[0] = (data.size shr 8).toByte()
+        packet[1] = (data.size and 0xff).toByte()
+        System.arraycopy(data, 0, packet, 2, data.size)
+        socket.outputStream.write(packet)
+        socket.outputStream.flush()
     }
 }

@@ -34,7 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vivokey.lib_bluetooth.domain.models.ConnectionStatus
+import com.vivokey.lib_nfc.domain.IsodepConnectionStatus
 import com.vivokey.vivokeyreader.presentation.components.AnimatedScanIcon
+import com.vivokey.vivokeyreader.presentation.components.Messages
 import com.vivokey.vivokeyreader.presentation.components.SelectedHostStatus
 import com.vivokey.vivokeyreader.presentation.components.ThreeCompartmentLayout
 import com.vivokey.vivokeyreader.presentation.components.TwoButtonRow
@@ -50,12 +52,6 @@ fun VivoKeyReader(
 
     VivoKeyReaderTheme {
 
-        LaunchedEffect(viewModel.connectionStatus.collectAsState().value) {
-            if(viewModel.connectionStatus.value == ConnectionStatus.CONNECTED) {
-                viewModel.stopColorAnimation()
-            }
-        }
-
         ThreeCompartmentLayout(
             showCompartment1 = viewModel.showSection1,
             showCompartment2 = viewModel.showSection2,
@@ -65,54 +61,33 @@ fun VivoKeyReader(
                     modifier = Modifier
                         .statusBarsPadding()
                         .padding(16.dp),
-                    text = if(viewModel.connectionStatus.collectAsState().value != ConnectionStatus.CONNECTED) "Scan your Apex" else "Uplink established",
+                    text = if(viewModel.bluetoothConnectionStatus.collectAsState().value != ConnectionStatus.CONNECTED) "Scan your Apex" else "Uplink established",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 24.sp,
                     color = Color.DarkGray
                 )
             },
             compartment2 = {
-                if(viewModel.connectionStatus.collectAsState().value != ConnectionStatus.DISCONNECTED) {
+                if(viewModel.bluetoothConnectionStatus.collectAsState().value != ConnectionStatus.DISCONNECTED) {
                     SelectedHostStatus(
                         modifier = Modifier.statusBarsPadding(),
                         selectedHost = viewModel.selectedDevice,
-                        connectionStatus = viewModel.connectionStatus.collectAsState().value
+                        connectionStatus = viewModel.bluetoothConnectionStatus.collectAsState().value
                     )
                 } else {
                     AnimatedScanIcon()
                 }
             },
             compartment3 = {
-                if(viewModel.connectionStatus.collectAsState().value == ConnectionStatus.DISCONNECTED) {
+                if(viewModel.bluetoothConnectionStatus.collectAsState().value == ConnectionStatus.DISCONNECTED) {
                     TwoButtonRow(
                         buttonOneClicked = {
-                            viewModel.startColorAnimation()
                         },
                         buttonTwoClicked = {
-                            viewModel.stopColorAnimation()
                         }
                     )
                 } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                    ) {
-                        LazyColumn {
-                            item {
-                                Column() {
-                                    Text(
-                                        text = "Total length: ${viewModel.inputBytes.size}",
-                                        color = Color.Black
-                                    )
-                                    Text(
-                                        text = viewModel.inputBytes.toHex(),
-                                        color = Color.Black
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    Messages(viewModel.messageLog)
                 }
             },
             colorGradientAngle = viewModel.colorGradientAngle
