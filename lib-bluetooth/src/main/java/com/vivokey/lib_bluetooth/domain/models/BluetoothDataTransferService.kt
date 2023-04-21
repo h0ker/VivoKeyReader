@@ -1,6 +1,5 @@
 package com.vivokey.lib_bluetooth.domain.models
 
-import android.annotation.SuppressLint
 import android.bluetooth.BluetoothSocket
 import android.os.Build
 import android.util.Log
@@ -9,7 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
+import org.apache.commons.codec.binary.Hex
 import java.io.IOException
 
 class BluetoothDataTransferService(
@@ -31,6 +30,8 @@ class BluetoothDataTransferService(
                     }
                     val length = length1 shl 8 or length2
                     socket.inputStream.readNBytes(buffer, 0, length)
+                    val messageString = Hex.encodeHexString(buffer.copyOfRange(0, length))
+                    Log.i("MESSAGE INFO:", "$length | ${messageString.length/2} | $messageString")
                     emit(buffer.copyOfRange(0, length))
                 } catch(e: IOException) {
                     Log.i("listenForIncomingMessages()", e.message ?: e.toString())
@@ -44,6 +45,8 @@ class BluetoothDataTransferService(
         val packet = ByteArray(2 + data.size)
         packet[0] = (data.size shr 8).toByte()
         packet[1] = (data.size and 0xff).toByte()
+        val length = packet[0].toInt() shl 8 or packet[1].toInt()
+        Log.i("OUTBOUND:", "$length | ${data.size}")
         System.arraycopy(data, 0, packet, 2, data.size)
         socket.outputStream.write(packet)
         socket.outputStream.flush()
