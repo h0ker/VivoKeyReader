@@ -15,8 +15,9 @@ interface ApexController {
     val connectionStatus: StateFlow<IsodepConnectionStatus>
     fun connect(tag: Tag)
     fun close()
-    fun issueApdu(instruction: Byte, p1: Byte = 0, p2: Byte = 0, data: ByteBuffer.() -> Unit = {}): ByteBuffer
+    fun issueApdu(cla: Byte, instruction: Byte, p1: Byte = 0, p2: Byte = 0, data: ByteBuffer.() -> Unit = {}): ByteBuffer
     fun transceive(data: ByteArray): ByteArray
     fun runSafe(tag: Tag, action: () -> Unit)
     fun getATR(): ByteArray?
+    fun selectISD(): ByteArray?
 }

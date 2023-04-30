@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.Color
 
 @Composable
 fun TwoButtonRow(
+    text1: String,
+    text2: String,
     buttonOneClicked: () -> Unit,
     buttonTwoClicked: () -> Unit
 ) {
@@ -25,7 +27,7 @@ fun TwoButtonRow(
             }
         ) {
             Text(
-                text = "Settings",
+                text = text1,
                 color = Color.DarkGray,
             )
         }
@@ -35,7 +37,7 @@ fun TwoButtonRow(
             }
         ) {
             Text(
-                text = "QR Scanner",
+                text = text2,
                 color = Color.DarkGray,
             )
         }

@@ -5,6 +5,7 @@ import android.nfc.tech.IsoDep
 import android.util.Log
 import com.vivokey.lib_nfc.domain.ApduUtils
 import com.vivokey.lib_nfc.domain.ApexController
+import com.vivokey.lib_nfc.domain.Consts
 import com.vivokey.lib_nfc.domain.IsodepConnectionStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.apache.commons.codec.binary.Hex
 import java.nio.ByteBuffer
 import javax.inject.Inject
 import kotlin.experimental.xor
@@ -80,11 +82,11 @@ open class ApexControllerImpl @Inject constructor(
         _connectionStatus.update { IsodepConnectionStatus.DISCONNECTED }
     }
 
-    override fun issueApdu(instruction: Byte, p1: Byte, p2: Byte, data: ByteBuffer.() -> Unit): ByteBuffer {
+    override fun issueApdu(cla: Byte, instruction: Byte, p1: Byte, p2: Byte, data: ByteBuffer.() -> Unit): ByteBuffer {
         try {
             val apdu = ByteBuffer
                 .allocate(256)
-                .put(0)
+                .put(cla)
                 .put(instruction)
                 .put(p1)
                 .put(p2)
@@ -161,11 +163,7 @@ open class ApexControllerImpl @Inject constructor(
         }
     }
 
-    fun String.decodeHex(): ByteArray {
-        check(length % 2 == 0) { "Must have an even length" }
-
-        return chunked(2)
-            .map { it.toInt(16).toByte() }
-            .toByteArray()
+    override fun selectISD(): ByteArray? {
+        return transceive(Hex.decodeHex(Consts.SELECT_ISD))
     }
 }

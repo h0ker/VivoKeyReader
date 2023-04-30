@@ -14,7 +14,6 @@ import com.vivokey.lib_bluetooth.domain.models.Host
 import com.vivokey.lib_bluetooth.domain.models.Message
 import com.vivokey.lib_bluetooth.domain.models.MessageType
 import com.vivokey.lib_nfc.domain.ApexController
-import com.vivokey.lib_nfc.domain.IsodepConnectionStatus
 import com.vivokey.lib_nfc.domain.NfcViewModel
 import com.vivokey.vivokeyreader.domain.models.Timer
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,8 +25,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import org.apache.commons.codec.binary.Hex
-import java.io.IOException
 import java.lang.Exception
 import javax.inject.Inject
 
@@ -39,6 +36,15 @@ class VivoKeyReaderViewModel @Inject constructor(
     private val timer: Timer
 ): NfcViewModel, ViewModel() {
 
+    enum class CompartmentState {
+        PAIRED_DEVICE_LIST,
+        BUTTONS,
+        SCAN_ANIM,
+        HOST_STATUS,
+        MESSAGES,
+        TITLE
+    }
+
     companion object {
         private const val VPCD_CTRL_LEN: Byte = 1
         private const val VPCD_CTRL_OFF: Byte = 0
@@ -47,19 +53,40 @@ class VivoKeyReaderViewModel @Inject constructor(
         private const val VPCD_CTRL_ATR: Byte = 4
     }
 
-    private val pairedDeviceList: StateFlow<List<Host>>
+    val pairedDeviceList: StateFlow<List<Host>>
         get() { return bluetoothController.pairedDevices }
 
     val bluetoothConnectionStatus: StateFlow<ConnectionStatus>
         get() { return bluetoothController.connectionStatus }
 
+    private val _compartment1State = mutableStateOf(CompartmentState.TITLE)
+    var compartment1State: CompartmentState
+        get() { return _compartment1State.value }
+        set(value) { _compartment1State.value = value }
+
+    private val _compartment2State = mutableStateOf(CompartmentState.PAIRED_DEVICE_LIST)
+    var compartment2State: CompartmentState
+        get() { return _compartment2State.value }
+        set(value) { _compartment2State.value = value }
+
+    private val _compartment3State = mutableStateOf(CompartmentState.BUTTONS)
+    var compartment3State: CompartmentState
+        get() { return _compartment3State.value }
+        set(value) { _compartment3State.value = value }
+
     private val _selectedDevice: MutableState<Host?> = mutableStateOf(null)
-    val selectedDevice: Host?
+    var selectedDevice: Host?
         get() { return _selectedDevice.value }
-    
+        set(value) { _selectedDevice.value = value }
+
     private val _messageLog: MutableState<List<Message?>> = mutableStateOf(listOf())
     val messageLog: List<Message?>
         get() { return _messageLog.value }
+
+    private val _showProgressPulse = mutableStateOf(false)
+    var showProgressPulse: Boolean
+        get() { return _showProgressPulse.value }
+        set(value) { _showProgressPulse.value = value }
 
     var showSection1 = MutableTransitionState(false)
 
@@ -94,6 +121,9 @@ class VivoKeyReaderViewModel @Inject constructor(
     }
 
     private fun startColorAnimation() {
+
+        _showProgressPulse.value = true
+
         if(timerJob == null) {
             timerJob = timer.getTimer(repeatMillis = 1) {
                 _colorGradientAngle.value += .5f
@@ -111,25 +141,21 @@ class VivoKeyReaderViewModel @Inject constructor(
         }
     }
 
-    //TODO: Fix this shit
-    //TODO: Discuss Room usage here instead of paired device fetch
     private suspend fun attemptBluetoothConnection() {
         viewModelScope.launch(Dispatchers.IO) {
-            for(host: Host in pairedDeviceList.value) {
-                _selectedDevice.value = host
-                bluetoothController.connectOverSPP(host).listen()
+            _selectedDevice.value?.let {
+                bluetoothController.connectOverSPP(it).listen()
             }
         }
     }
 
     private fun stopColorAnimation() {
+        _showProgressPulse.value = false
         timerJob?.cancel()
     }
 
     private fun killConnections() {
         stopColorAnimation()
-        _messageLog.value = listOf()
-        _selectedDevice.value = null
         bluetoothController.killConnection()
         apexController.close()
     }
@@ -153,6 +179,18 @@ class VivoKeyReaderViewModel @Inject constructor(
                         killConnections()
                     }
                 }
+                VPCD_CTRL_RESET -> {
+                    try {
+                        val response = apexController.selectISD()
+                        response?.let {
+                            //bluetoothController.trySendMessage(it)
+                            _messageLog.value += Message(it, MessageType.SENT)
+                        }
+                    } catch(e: Exception) {
+                        Log.i("handleMessage() - RESET", e.message ?: e.toString())
+                        killConnections()
+                    }
+                }
             }
         } else { //APDU
             try {
@@ -168,9 +206,23 @@ class VivoKeyReaderViewModel @Inject constructor(
         }
     }
 
+    fun onScanPressed() {
+        _compartment3State.value = CompartmentState.SCAN_ANIM
+        _compartment2State.value = CompartmentState.HOST_STATUS
+    }
+
+    fun onSelectHostPressed() {
+        _compartment3State.value = CompartmentState.BUTTONS
+        _compartment2State.value = CompartmentState.PAIRED_DEVICE_LIST
+    }
+
     override fun onTagScan(tag: Tag) {
+        if(_selectedDevice.value == null) {
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             startColorAnimation()
+            _compartment3State.value = CompartmentState.MESSAGES
             attemptBluetoothConnection()
             apexController.connect(tag)
         }
@@ -178,9 +230,11 @@ class VivoKeyReaderViewModel @Inject constructor(
 
     fun onBack() {
         if(_selectedDevice.value != null) {
+            _messageLog.value = listOf()
             stopColorAnimation()
             _selectedDevice.value = null
             bluetoothController.killConnection()
+            onSelectHostPressed()
         }
     }
 }

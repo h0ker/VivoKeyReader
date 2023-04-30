@@ -1,17 +1,27 @@
 package com.vivokey.vivokeyreader.presentation.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.hoker.bluetoothrfcomm.R
 import com.vivokey.vivokeyreader.ui.theme.VivoKeyReaderTheme
 import kotlin.math.PI
 import kotlin.math.cos
@@ -30,41 +40,55 @@ fun ThreeCompartmentLayout(
     compartment1: @Composable () -> Unit,
     compartment2: @Composable () -> Unit,
     compartment3: @Composable () -> Unit,
+    showProgressPulse: Boolean,
     colorGradientAngle: Float
 ) {
     VivoKeyReaderTheme {
         Box(
-            modifier = modifier.fillMaxSize()
+            modifier = modifier
+                .fillMaxSize()
+                .gradientBackground(
+                    colors = listOf(
+                        if (showProgressPulse) Color.Yellow else Color.DarkGray,
+                        Color.DarkGray,
+                    ),
+                    angle = colorGradientAngle
+                )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .gradientBackground(
-                        colors = listOf(
-                            Color.Yellow,
-                            Color.LightGray,
-                        ),
-                        angle = colorGradientAngle
-                    )
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(Color.DarkGray)
+                    .animateContentSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                SlidingVisibilityContent(showContent = showCompartment1) {
+                SlidingVisibilityContent(
+                    modifier = Modifier.padding(top = 32.dp),
+                    showContent = showCompartment1
+                ) {
                     compartment1()
                 }
                 Divider(
-                    height = 1.dp
+                    height = 20.dp
                 )
                 SlidingVisibilityContent(showContent = showCompartment2) {
                     compartment2()
                 }
                 Divider(
-                    modifier = Modifier.weight(1f)
+                    height = 20.dp
                 )
                 SlidingVisibilityContent(showContent = showCompartment3) {
                     compartment3()
                 }
-                Divider(
-                    height = 32.dp
+                /*
+                Image(
+                    modifier = Modifier.size(64.dp),
+                    painter = painterResource(id = R.drawable.monochrome_vivokey),
+                    contentDescription = null,
                 )
+                 */
             }
         }
     }

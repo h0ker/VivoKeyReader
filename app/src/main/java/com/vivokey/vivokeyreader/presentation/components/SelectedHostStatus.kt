@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,7 +29,8 @@ import com.vivokey.lib_bluetooth.domain.models.Host
 fun SelectedHostStatus(
     modifier: Modifier = Modifier,
     selectedHost: Host?,
-    connectionStatus: ConnectionStatus
+    connectionStatus: ConnectionStatus,
+    onCancel: () -> Unit
 ) {
     Row(
         modifier = modifier
@@ -34,6 +39,17 @@ fun SelectedHostStatus(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        IconButton(
+            onClick = {
+                onCancel()
+            }
+        ) {
+            Icon(
+                modifier = Modifier.size(32.dp),
+                imageVector = Icons.Filled.ArrowBack,
+                contentDescription = null
+            )
+        }
         Column(
         ) {
             Text(

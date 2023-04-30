@@ -34,7 +34,9 @@ fun SlidingVisibilityContent(
 ) {
     Box(
         modifier = modifier
-            .background(Color.Transparent)
+            .background(Color.DarkGray)
+            .clip(RoundedCornerShape(16.dp))
+            /*
             .drawBehind {
                 RoundedCornerPaths.topLeftInvertedCorner(
                     drawScope = this,
@@ -47,7 +49,7 @@ fun SlidingVisibilityContent(
                     height = 32.dp.toPx()
                 )
             }
-            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+             */
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
@@ -60,6 +62,7 @@ fun SlidingVisibilityContent(
                             easing = LinearOutSlowInEasing
                         )
                     )
+                    .background(Color.LightGray)
                     .fillMaxWidth(),
                 visibleState = showContent,
                 enter = expandVertically(
@@ -75,6 +78,7 @@ fun SlidingVisibilityContent(
             ) {
                 content.invoke()
             }
+            /*
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -85,6 +89,7 @@ fun SlidingVisibilityContent(
                     height = 32.dp.toPx()
                 )
             }
+             */
         }
     }
 }
