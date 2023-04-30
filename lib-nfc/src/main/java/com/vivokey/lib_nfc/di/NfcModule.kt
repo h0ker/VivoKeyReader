@@ -4,7 +4,6 @@ import android.content.Context
 import android.nfc.NfcAdapter
 import com.vivokey.lib_nfc.data.ApexControllerImpl
 import com.vivokey.lib_nfc.domain.ApexController
-import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

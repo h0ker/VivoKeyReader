@@ -50,8 +50,7 @@ fun SelectedHostStatus(
                 contentDescription = null
             )
         }
-        Column(
-        ) {
+        Column {
             Text(
                 text = selectedHost?.name ?: "Unknown",
                 color = Color.DarkGray,
