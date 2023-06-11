@@ -1,4 +1,4 @@
-package com.vivokey.vivokeyreader.domain.models
+package com.hoker.lib_utils.domain
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,7 +11,17 @@ import javax.inject.Inject
 
 class Timer @Inject constructor() {
     private val job = SupervisorJob()
-    private val scope = CoroutineScope(Dispatchers.Default + job)
+    private val scope = CoroutineScope(Dispatchers.IO + job)
+
+    fun repeatEverySecond(action: suspend () -> Unit): Job {
+        return scope.launch {
+            while (isActive) {
+                action()
+                delay(1000L)
+            }
+        }
+    }
+
     private fun startCoroutineTimer(delayMillis: Long = 0, repeatMillis: Long = 0, action: () -> Unit) = scope.launch(Dispatchers.IO) {
         delay(delayMillis)
         if(repeatMillis > 0) {

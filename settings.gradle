@@ -16,3 +16,4 @@ rootProject.name = "VivoKeyReader"
 include ':app'
 include ':lib-bluetooth'
 include ':lib-nfc'
+include ':lib-utils'

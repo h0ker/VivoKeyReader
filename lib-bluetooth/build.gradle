@@ -56,4 +56,6 @@ dependencies {
     implementation "com.google.android.material:material:$material_version"
     implementation "commons-codec:commons-codec:$commons_codec_version"
     implementation "androidx.compose.compiler:compiler:$compose_compiler_version"
+
+    implementation project(':lib-utils')
 }

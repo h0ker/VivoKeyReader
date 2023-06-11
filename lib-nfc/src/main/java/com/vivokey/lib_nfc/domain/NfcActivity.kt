@@ -27,11 +27,6 @@ abstract class NfcActivity : ComponentActivity(), NfcAdapter.ReaderCallback {
         nfcAdapter.disableReaderMode(this)
     }
 
-    fun cycleNfcAdapter() {
-        this.onPause()
-        this.onResume()
-    }
-
     override fun onTagDiscovered(tag: Tag?) {
     }
 }

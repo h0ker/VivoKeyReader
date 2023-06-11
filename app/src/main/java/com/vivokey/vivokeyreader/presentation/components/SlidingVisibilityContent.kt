@@ -7,24 +7,16 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.vivokey.vivokeyreader.presentation.paths.RoundedCornerPaths
 
 @Composable
 fun SlidingVisibilityContent(
@@ -36,20 +28,6 @@ fun SlidingVisibilityContent(
         modifier = modifier
             .background(Color.DarkGray)
             .clip(RoundedCornerShape(16.dp))
-            /*
-            .drawBehind {
-                RoundedCornerPaths.topLeftInvertedCorner(
-                    drawScope = this,
-                    width = 32.dp.toPx(),
-                    height = 32.dp.toPx()
-                )
-                RoundedCornerPaths.topRightInvertedCorner(
-                    drawScope = this,
-                    width = 32.dp.toPx(),
-                    height = 32.dp.toPx()
-                )
-            }
-             */
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
@@ -78,18 +56,6 @@ fun SlidingVisibilityContent(
             ) {
                 content.invoke()
             }
-            /*
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 31.dp)
-            ) {
-                RoundedCornerPaths.bottomCorners(
-                    this,
-                    height = 32.dp.toPx()
-                )
-            }
-             */
         }
     }
 }

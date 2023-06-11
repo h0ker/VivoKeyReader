@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.vivokey.lib_bluetooth.domain.models.ConnectionStatus
+import com.hoker.lib_utils.domain.ConnectionStatus
 import com.vivokey.vivokeyreader.presentation.components.AnimatedScanIcon
 import com.vivokey.vivokeyreader.presentation.components.HostCard
 import com.vivokey.vivokeyreader.presentation.components.Messages
@@ -43,9 +43,9 @@ fun VivoKeyReader(
                             modifier = Modifier
                                 .padding(16.dp),
                             text = if(viewModel.bluetoothConnectionStatus.collectAsState().value == ConnectionStatus.CONNECTED) {
-                                "Uplink established"
+                                "Link established"
                             } else if(viewModel.selectedDevice != null) {
-                                   "Scan your Apex"
+                                   "Scan NFC Device"
                             } else {
                                    "Select a Host"
                             },
@@ -62,8 +62,7 @@ fun VivoKeyReader(
                 when(viewModel.compartment2State) {
 
                     VivoKeyReaderViewModel.CompartmentState.PAIRED_DEVICE_LIST -> {
-                        LazyColumn(
-                        ) {
+                        LazyColumn {
                             items(viewModel.pairedDeviceList.value) { host ->
                                 host.name?.let {
                                     HostCard(host = host) {

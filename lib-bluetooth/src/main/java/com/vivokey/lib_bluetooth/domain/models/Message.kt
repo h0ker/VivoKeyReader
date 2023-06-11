@@ -2,10 +2,12 @@ package com.vivokey.lib_bluetooth.domain.models
 
 enum class MessageType {
     SENT,
-    RECEIVED
+    RECEIVED,
+    ERROR
 }
 data class Message(
-    val bytes: ByteArray,
+    val bytes: ByteArray? = null,
+    val exception: Throwable? = null,
     val type: MessageType
 ) {
     override fun equals(other: Any?): Boolean {
@@ -15,9 +17,7 @@ data class Message(
         other as Message
 
         if (!bytes.contentEquals(other.bytes)) return false
-        if (type != other.type) return false
-
-        return true
+        return type == other.type
     }
 
     override fun hashCode(): Int {

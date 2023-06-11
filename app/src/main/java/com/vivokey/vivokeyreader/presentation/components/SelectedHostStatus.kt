@@ -22,7 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.vivokey.lib_bluetooth.domain.models.ConnectionStatus
+import com.hoker.lib_utils.domain.ConnectionStatus
 import com.vivokey.lib_bluetooth.domain.models.Host
 
 @Composable
@@ -63,7 +63,7 @@ fun SelectedHostStatus(
             )
         }
         Box {
-            selectedHost?.let {  host ->
+            selectedHost?.let {
                 androidx.compose.animation.AnimatedVisibility(visible = connectionStatus == ConnectionStatus.DISCONNECTED) {
                     Column(
                         modifier = Modifier.padding(end = 16.dp),

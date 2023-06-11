@@ -12,8 +12,10 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import com.vivokey.lib_bluetooth.domain.models.BluetoothController
 import com.vivokey.lib_bluetooth.domain.models.BluetoothDataTransferService
-import com.vivokey.lib_bluetooth.domain.models.ConnectionStatus
+import com.hoker.lib_utils.domain.ConnectionStatus
+import com.hoker.lib_utils.domain.OperationResult
 import com.vivokey.lib_bluetooth.domain.models.Host
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,11 +23,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.apache.commons.codec.binary.Hex
 import java.util.UUID
 
 @SuppressLint("MissingPermission")
-class AndroidBluetoothController (
+class BluetoothControllerImpl (
     private val context: Context,
 ): BluetoothController {
 
@@ -57,9 +62,14 @@ class AndroidBluetoothController (
         updatePairedDevices()
     }
 
-    override suspend fun trySendMessage(message: ByteArray) {
-        Log.i("trySendMessage():", Hex.encodeHexString(message))
-        _dataTransferService?.sendMessage(message)
+    override suspend fun sendMessage(message: ByteArray): OperationResult<Unit> {
+        return try {
+            Log.i("trySendMessage():", Hex.encodeHexString(message))
+            _dataTransferService?.sendMessage(message)
+            OperationResult.Success(Unit)
+        } catch(e: Exception) {
+            OperationResult.Failure(e)
+        }
     }
 
     override fun killConnection() {
@@ -79,16 +89,20 @@ class AndroidBluetoothController (
             host.address.let {
                 if (BluetoothAdapter.checkBluetoothAddress(it)) {
                     val bluetoothDevice = bluetoothAdapter?.getRemoteDevice(it)
-                    val socket =
-                        bluetoothDevice?.createRfcommSocketToServiceRecord(SPP_UUID)
+                    val socket = bluetoothDevice?.createRfcommSocketToServiceRecord(SPP_UUID)
+
                     if (socket != null) {
                         try {
-                            socket.connect()
                             _socket = socket
-                            _connectionStatus.update { ConnectionStatus.CONNECTED }
-                            _dataTransferService = BluetoothDataTransferService(socket)
-                            _dataTransferService?.let { transferService ->
-                                emitAll(transferService.listenForIncomingMessages())
+                            val isSuccessful = connectWithTimeout(socket)
+                            if(isSuccessful) {
+                                _connectionStatus.update { ConnectionStatus.CONNECTED }
+                                _dataTransferService = BluetoothDataTransferService(socket)
+                                _dataTransferService?.let { transferService ->
+                                    emitAll(transferService.listenForIncomingMessages())
+                                }
+                            } else {
+                                _connectionStatus.update { ConnectionStatus.DISCONNECTED }
                             }
                         } catch (e: Exception) {
                             Log.i("connectOverSPP():", e.message ?: e.toString())
@@ -98,6 +112,33 @@ class AndroidBluetoothController (
                 }
             }
         }
+    }
+
+    private suspend fun connectWithTimeout(
+        socket: BluetoothSocket,
+        timeoutMillis: Long = 5000L
+    ): Boolean = withContext(Dispatchers.IO) {
+        var isSuccessful = true
+
+        val job = launch {
+            try {
+                socket.connect()
+            } catch(e: Exception) {
+                isSuccessful = false
+            }
+        }
+
+        withTimeoutOrNull(timeoutMillis) {
+            job.join()
+        } ?: run {
+            try {
+                socket.close()
+            } catch(e: Exception) {
+                isSuccessful = false
+            }
+        }
+
+        return@withContext isSuccessful
     }
 
     private fun updatePairedDevices() {

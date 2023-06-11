@@ -3,7 +3,7 @@ package com.vivokey.lib_bluetooth.di
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
-import com.vivokey.lib_bluetooth.data.AndroidBluetoothController
+import com.vivokey.lib_bluetooth.data.BluetoothControllerImpl
 import com.vivokey.lib_bluetooth.domain.models.BluetoothController
 import dagger.Module
 import dagger.Provides
@@ -19,7 +19,7 @@ object BluetoothModule {
     @Provides
     @Singleton
     fun provideBluetoothController(@ApplicationContext context: Context): BluetoothController {
-        return AndroidBluetoothController(context)
+        return BluetoothControllerImpl(context)
     }
 
     @Provides

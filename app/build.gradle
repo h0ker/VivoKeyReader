@@ -75,4 +75,5 @@ dependencies {
 
     implementation project(':lib-bluetooth')
     implementation project(':lib-nfc')
+    implementation project(':lib-utils')
 }

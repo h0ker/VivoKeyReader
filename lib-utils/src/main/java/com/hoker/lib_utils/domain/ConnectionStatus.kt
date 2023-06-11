@@ -1,4 +1,4 @@
-package com.vivokey.lib_bluetooth.domain.models
+package com.hoker.lib_utils.domain
 
 enum class ConnectionStatus {
     CONNECTED,
