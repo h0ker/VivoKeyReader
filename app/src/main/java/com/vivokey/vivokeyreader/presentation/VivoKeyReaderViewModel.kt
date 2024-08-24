@@ -2,36 +2,31 @@ package com.vivokey.vivokeyreader.presentation
 
 import android.annotation.SuppressLint
 import android.nfc.Tag
-import androidx.compose.animation.core.MutableTransitionState
+import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.carbidecowboy.intra.data.IsodepControllerImpl
+import com.carbidecowboy.intra.di.NfcModule
+import com.carbidecowboy.intra.domain.NfcAdapterController
+import com.carbidecowboy.intra.domain.NfcController
+import com.carbidecowboy.intra.domain.NfcViewModel
+import com.carbidecowboy.intra.domain.OperationResult
 import com.vivokey.lib_bluetooth.domain.models.BluetoothController
 import com.hoker.lib_utils.domain.ConnectionStatus
-import com.hoker.lib_utils.domain.OperationResult
 import com.vivokey.lib_bluetooth.domain.models.Host
 import com.vivokey.lib_bluetooth.domain.models.Message
 import com.vivokey.lib_bluetooth.domain.models.MessageType
-import com.vivokey.lib_nfc.domain.NfcController
-import com.vivokey.lib_nfc.domain.NfcViewModel
-import com.hoker.lib_utils.domain.Timer
-import com.vivokey.lib_nfc.di.NfcModule
-import com.vivokey.lib_nfc.domain.Consts
-import com.vivokey.lib_nfc.domain.ProtocolType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import org.apache.commons.codec.binary.Hex
 import javax.inject.Inject
 
@@ -39,19 +34,10 @@ import javax.inject.Inject
 @SuppressLint("MissingPermission")
 @HiltViewModel
 class VivoKeyReaderViewModel @Inject constructor(
-    private val nfcControllerFactory: NfcModule.NfcControllerFactory,
-    private val bluetoothController: BluetoothController,
-    private val timer: Timer
-): NfcViewModel, ViewModel() {
-
-    enum class CompartmentState {
-        PAIRED_DEVICE_LIST,
-        BUTTONS,
-        SCAN_ANIM,
-        HOST_STATUS,
-        MESSAGES,
-        TITLE
-    }
+    nfcAdapterController: NfcAdapterController,
+    nfcControllerFactory: NfcModule.NfcControllerFactory,
+    private val bluetoothController: BluetoothController
+): NfcViewModel(nfcAdapterController, nfcControllerFactory) {
 
     companion object {
         private const val VPCD_CTRL_LEN: Byte = 1
@@ -60,12 +46,25 @@ class VivoKeyReaderViewModel @Inject constructor(
         private const val VPCD_CTRL_RESET: Byte = 2
         private const val VPCD_CTRL_ATR: Byte = 4
 
+        const val SUCCESS_RESPONSE = "9000"
+        const val SELECT_CODE = "00A40400"
+        const val ISD_AID = "A000000151000000"
+        const val SELECT_ISD = "00A4040008A00000015100000000"
+        const val GET_READER_FIRMWARE_APDU = "FF00480000"
+        const val GET_READER_FIRMWARE_VERSION = "5669766F4B6579536D6172745265616465725F56312E30"
+        const val PPDU_DIRECT_TRANSMIT_PREFIX = "FF000000"
+        const val PPDU_SPRINGCARD_ENCAPSULATE_PREFIX = "FFFE"
+        const val GET_UID_APDU = "FFCA000000"
+        const val GET_ATS_APDU = "FFCA010000"
+        const val TEST_NFC_A_ATR = "3B8F8001804F0CA0000003060300030000000068"
+
         val notSupported = byteArrayOf(0x6a.toByte(), 0x81.toByte())
         val error = byteArrayOf(0x64.toByte(), 0x00.toByte())
+        val wrongLength = byteArrayOf(0x67.toByte(), 0x00.toByte())
+        val commandAborted = byteArrayOf(0x6f.toByte(), 0x00.toByte())
     }
 
-    private var nfcController: NfcController? = null
-    private val connectionMutex = Mutex()
+    private var _nfcController: NfcController? = null
 
     val pairedDeviceList: StateFlow<List<Host>>
         get() { return bluetoothController.pairedDevices }
@@ -73,66 +72,23 @@ class VivoKeyReaderViewModel @Inject constructor(
     val bluetoothConnectionStatus: StateFlow<ConnectionStatus>
         get() { return bluetoothController.connectionStatus }
 
-    private val nfcConnectionStatus: StateFlow<ConnectionStatus>?
-        get() { return nfcController?.connectionStatus }
-
-    private val _compartment1State = mutableStateOf(CompartmentState.TITLE)
-    var compartment1State: CompartmentState
-        get() { return _compartment1State.value }
-        set(value) { _compartment1State.value = value }
-
-    private val _compartment2State = mutableStateOf(CompartmentState.PAIRED_DEVICE_LIST)
-    var compartment2State: CompartmentState
-        get() { return _compartment2State.value }
-        set(value) { _compartment2State.value = value }
-
-    private val _compartment3State = mutableStateOf(CompartmentState.BUTTONS)
-    var compartment3State: CompartmentState
-        get() { return _compartment3State.value }
-        set(value) { _compartment3State.value = value }
-
     private val _selectedDevice: MutableState<Host?> = mutableStateOf(null)
     var selectedDevice: Host?
         get() { return _selectedDevice.value }
         set(value) { _selectedDevice.value = value }
 
+    private val _uid: MutableState<ByteArray?> = mutableStateOf(null)
+
     private val _messageLog: MutableState<List<Message?>> = mutableStateOf(listOf())
     val messageLog: List<Message?>
         get() { return _messageLog.value }
 
-    private val _showProgressPulse = mutableStateOf(false)
-    var showProgressPulse: Boolean
-        get() { return _showProgressPulse.value }
-        set(value) { _showProgressPulse.value = value }
-
-    var showSection1 = MutableTransitionState(false)
-
-    var showSection2 = MutableTransitionState(false)
-
-    var showSection3 = MutableTransitionState(false)
-
-    private val _colorGradientAngle = mutableStateOf(0f)
-    val colorGradientAngle: Float
-        get() { return _colorGradientAngle.value }
-
-    private var timerJob: Job? = null
-
     init {
-        viewModelScope.launch {
-            delay(600)
-            showSection2.targetState = true
-            delay(600)
-            showSection1.targetState = true
-            delay(600)
-            showSection3.targetState = true
-        }
-
         viewModelScope.launch {
             bluetoothConnectionStatus
                 .debounce(1000)
                 .collect {
                 if(it == ConnectionStatus.DISCONNECTED) {
-                    stopColorAnimation()
                     killConnections()
                 }
             }
@@ -150,27 +106,6 @@ class VivoKeyReaderViewModel @Inject constructor(
         }.launchIn(viewModelScope)
     }
 
-    private fun startColorAnimation() {
-
-        _showProgressPulse.value = true
-
-        if(timerJob == null) {
-            timerJob = timer.getTimer(repeatMillis = 1) {
-                _colorGradientAngle.value += .5f
-            }
-        }
-        timerJob?.let {
-            if(!it.isCancelled) {
-                return
-            }
-            else {
-                timerJob = timer.getTimer(repeatMillis = 1) {
-                    _colorGradientAngle.value += .5f
-                }
-            }
-        }
-    }
-
     private suspend fun attemptBluetoothConnection() {
         viewModelScope.launch(Dispatchers.IO) {
             _selectedDevice.value?.let {
@@ -179,15 +114,27 @@ class VivoKeyReaderViewModel @Inject constructor(
         }
     }
 
-    private fun stopColorAnimation() {
-        _showProgressPulse.value = false
-        timerJob?.cancel()
+    private suspend fun killConnections() {
+        bluetoothController.killConnection()
+        _nfcController?.close()
+        _nfcController = null
+        _uid.value = null
     }
 
-    private fun killConnections() {
-        stopColorAnimation()
-        bluetoothController.killConnection()
-        nfcController?.close()
+    private fun checkForDirectTransmit(message: ByteArray): Boolean {
+        return try {
+            Hex.encodeHexString(message.copyOfRange(0, 4), false) == PPDU_DIRECT_TRANSMIT_PREFIX
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun checkForSpringCardEncapsulate(message: ByteArray): Boolean {
+        return try {
+            Hex.encodeHexString(message.copyOfRange(0, 2), false) == PPDU_SPRINGCARD_ENCAPSULATE_PREFIX
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private suspend fun handleMessage(message: ByteArray) {
@@ -202,13 +149,13 @@ class VivoKeyReaderViewModel @Inject constructor(
                 }
                 else -> {
 
-                    when(val response = nfcController?.transceive(byteArrayOf(message.first()))) {
+                    when(val response = _nfcController?.transceive(byteArrayOf(message.first()))) {
                         is OperationResult.Success -> {
                             when(val hostResult = bluetoothController.sendMessage(response.data)) {
-                                is OperationResult.Success -> {
+                                is com.hoker.lib_utils.domain.OperationResult.Success -> {
                                     _messageLog.value += Message(bytes = response.data, type = MessageType.SENT)
                                 }
-                                is OperationResult.Failure -> {
+                                is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                                     handleError(hostResult.exception)
                                 }
                             }
@@ -226,36 +173,39 @@ class VivoKeyReaderViewModel @Inject constructor(
             //PPDUs
             if(message.first() == 0xff.toByte()) {
 
-                if(Hex.encodeHexString(message).uppercase() == Consts.GET_READER_FIRMWARE_APDU) {
+                if (Hex.encodeHexString(message).uppercase() == GET_READER_FIRMWARE_APDU) {
                     handleReaderFirmwareRequest()
-                } else if(Hex.encodeHexString(message).uppercase() == Consts.GET_UID_APDU) {
+                } else if (Hex.encodeHexString(message).uppercase() == GET_UID_APDU) {
                     handleUidRequest()
-                } else if(Hex.encodeHexString(message).uppercase() == Consts.GET_ATS_APDU) {
+                } else if (Hex.encodeHexString(message).uppercase() == GET_ATS_APDU) {
                     handleAtsRequest()
-                } else if(message[4].toInt() == 1) {
-                    handleSingleBytePpdu(message)
-                } else {
+                } else if (checkForDirectTransmit(message)) {
+                    handlePassthroughPpdu(message)
+                } else if (checkForSpringCardEncapsulate(message)) {
+                    handlePassthroughPpdu(message)
+                }
+                else {
                     when(val response = bluetoothController.sendMessage(notSupported)) {
-                        is OperationResult.Success -> {
+                        is com.hoker.lib_utils.domain.OperationResult.Success -> {
                             _messageLog.value += Message(bytes = notSupported, type = MessageType.SENT)
                         }
-                        is OperationResult.Failure -> {
+                        is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                             handleError(response.exception)
                         }
                     }
                 }
 
             } else { //Standard APDUs
-                when(nfcController?.getProtocolType()) {
-                    ProtocolType.ISODEP -> {
+                when(_nfcController) {
+                    is IsodepControllerImpl -> {
                         if (message.isNotEmpty()) {
-                            when(val response = nfcController?.transceive(message)) {
+                            when(val response = _nfcController?.transceive(message)) {
                                 is OperationResult.Success -> {
                                     when(val hostResult = bluetoothController.sendMessage(response.data)) {
-                                        is OperationResult.Success -> {
+                                        is com.hoker.lib_utils.domain.OperationResult.Success -> {
                                             _messageLog.value += Message(bytes = response.data, type = MessageType.SENT)
                                         }
-                                        is OperationResult.Failure -> {
+                                        is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                                             handleError(hostResult.exception)
                                         }
                                     }
@@ -269,58 +219,74 @@ class VivoKeyReaderViewModel @Inject constructor(
                             }
                         }
                     }
-                    ProtocolType.NFC_A -> {
+                    null -> {
+                        handleError()
+                    }
+                    else -> {
                         when(val hostResult = bluetoothController.sendMessage(notSupported)) {
-                            is OperationResult.Success -> {
+                            is com.hoker.lib_utils.domain.OperationResult.Success -> {
                                 _messageLog.value += Message(bytes = notSupported, type = MessageType.SENT)
                             }
-                            is OperationResult.Failure -> {
+                            is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                                 handleError(hostResult.exception)
                             }
                         }
                     }
-                    null -> {
-                        handleError()
-                    }
                 }
             }
         }
     }
 
-    private suspend fun handleSingleBytePpdu(message: ByteArray) {
-        when(val response = nfcController?.transceive(byteArrayOf(message[5]))) {
-            is OperationResult.Success -> {
-                val successResponse = response.data + byteArrayOf(0x90.toByte(), 0x00.toByte())
-                when(val hostResult = bluetoothController.sendMessage(successResponse)) {
-                    is OperationResult.Success -> {
-                        _messageLog.value += Message(bytes = successResponse, type = MessageType.SENT)
-                    }
-                    is OperationResult.Failure -> {
-                        handleError(hostResult.exception)
+    private suspend fun handlePassthroughPpdu(message: ByteArray) {
+
+        try {
+
+            val length = message[4].toInt()
+            val payload = message.copyOfRange(5, message.size)
+
+            //Get size of payload only
+            if (length != message.size - 5) {
+                _messageLog.value += Message(bytes = wrongLength, type = MessageType.SENT)
+                return
+            }
+
+            when(val response = _nfcController?.transceive((payload))) {
+                is OperationResult.Success -> {
+                    val successResponse = response.data + byteArrayOf(0x90.toByte(), 0x00.toByte())
+                    when(val hostResult = bluetoothController.sendMessage(successResponse)) {
+                        is com.hoker.lib_utils.domain.OperationResult.Success -> {
+                            _messageLog.value += Message(bytes = successResponse, type = MessageType.SENT)
+                        }
+                        is com.hoker.lib_utils.domain.OperationResult.Failure -> {
+                            handleError(hostResult.exception)
+                        }
                     }
                 }
+                is OperationResult.Failure -> {
+                    _messageLog.value += Message(bytes = commandAborted, type = MessageType.SENT)
+                    bluetoothController.sendMessage(commandAborted)
+                    handleError(response.exception)
+                }
+                null -> {}
             }
-            is OperationResult.Failure -> {
-                handleError(response.exception)
-            }
-            null -> {
-                handleError()
-            }
+
+        } catch (e: Exception) {
+            _messageLog.value += Message(bytes = wrongLength, type = MessageType.SENT)
         }
     }
 
     private suspend fun handleAtsRequest() {
-        when(val ats = nfcController?.getATS()) {
+        when(val ats = _nfcController?.getAts()) {
             is OperationResult.Success -> {
                 if(ats.data == null) {
                     handleError()
                 } else {
                     when (val hostResult = bluetoothController.sendMessage(ats.data!!)) {
-                        is OperationResult.Success -> {
+                        is com.hoker.lib_utils.domain.OperationResult.Success -> {
                             _messageLog.value += Message(bytes = ats.data, type = MessageType.SENT)
                         }
 
-                        is OperationResult.Failure -> {
+                        is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                             handleError(hostResult.exception)
                         }
                     }
@@ -331,10 +297,10 @@ class VivoKeyReaderViewModel @Inject constructor(
             }
             null -> {
                 when(val hostResult = bluetoothController.sendMessage(error)) {
-                    is OperationResult.Success -> {
+                    is com.hoker.lib_utils.domain.OperationResult.Success -> {
                         _messageLog.value += Message(bytes = error, type = MessageType.SENT)
                     }
-                    is OperationResult.Failure -> {
+                    is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                         handleError(hostResult.exception)
                     }
                 }
@@ -343,23 +309,23 @@ class VivoKeyReaderViewModel @Inject constructor(
     }
 
     private suspend fun handleUidRequest() {
-        val uid = nfcController?.getUid()
-        if(uid != null) {
-            val response = uid + byteArrayOf(0x90.toByte(), 0x00.toByte())
+        _uid.value?.let { validUid ->
+            val response = validUid + byteArrayOf(0x90.toByte(), 0x00.toByte())
             when(val hostResult = bluetoothController.sendMessage(response)) {
-                is OperationResult.Success -> {
+                is com.hoker.lib_utils.domain.OperationResult.Success -> {
                     _messageLog.value += Message(bytes = response, type = MessageType.SENT)
                 }
-                is OperationResult.Failure -> {
+                is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                     handleError(hostResult.exception)
                 }
             }
-        } else {
+        }
+        if (_uid.value == null) {
             when(val hostResult = bluetoothController.sendMessage(error)) {
-                is OperationResult.Success -> {
+                is com.hoker.lib_utils.domain.OperationResult.Success -> {
                     _messageLog.value += Message(bytes = error, type = MessageType.SENT)
                 }
-                is OperationResult.Failure -> {
+                is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                     handleError(hostResult.exception)
                 }
             }
@@ -367,23 +333,25 @@ class VivoKeyReaderViewModel @Inject constructor(
     }
 
     private suspend fun handleReaderFirmwareRequest() {
-        val firmwareVersionBytes = Hex.decodeHex(Consts.GET_READER_FIRMWARE_VERSION)
+        val firmwareVersionBytes = Hex.decodeHex(GET_READER_FIRMWARE_VERSION)
         when(val hostResult = bluetoothController.sendMessage(firmwareVersionBytes)) {
-            is OperationResult.Success -> {
+            is com.hoker.lib_utils.domain.OperationResult.Success -> {
                 _messageLog.value += Message(bytes = firmwareVersionBytes, type = MessageType.SENT)
             }
-            is OperationResult.Failure -> {
+            is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                 handleError(hostResult.exception)
             }
         }
     }
 
-    private fun handleResetRequest() {
-        when(val response = nfcController?.selectISD()) {
-            is OperationResult.Success -> {
-                _messageLog.value += Message(bytes = response.data, type = MessageType.SENT)
+    private suspend fun handleResetRequest() {
+        when(val response = _nfcController?.selectISD()) {
+            is com.hoker.lib_utils.domain.OperationResult.Success -> {
+                response.data?.let {
+                    _messageLog.value += Message(bytes = response.data, type = MessageType.SENT)
+                }
             }
-            is OperationResult.Failure -> {
+            is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                 handleError(response.exception)
             }
             null -> {
@@ -392,17 +360,29 @@ class VivoKeyReaderViewModel @Inject constructor(
         }
     }
 
+    private suspend fun NfcController.selectISD(): com.hoker.lib_utils.domain.OperationResult<ByteArray?> {
+        return when(val result = this.transceive(Hex.decodeHex(SELECT_ISD))) {
+            is OperationResult.Success -> {
+                com.hoker.lib_utils.domain.OperationResult.Success(result.data)
+            }
+            is OperationResult.Failure -> {
+                com.hoker.lib_utils.domain.OperationResult.Failure()
+            }
+            else -> com.hoker.lib_utils.domain.OperationResult.Failure()
+        }
+    }
+
     private suspend fun handleAtrRequest() {
-        when(val atr = nfcController?.getATR()) {
+        when(val atr = _nfcController?.getAtr()) {
             is OperationResult.Success -> {
                 if(atr.data == null) {
                     handleError()
                 } else {
                     when(val hostResult = bluetoothController.sendMessage(atr.data!!)) {
-                        is OperationResult.Success -> {
+                        is com.hoker.lib_utils.domain.OperationResult.Success -> {
                             _messageLog.value += Message(bytes = atr.data, type = MessageType.SENT)
                         }
-                        is OperationResult.Failure -> {
+                        is com.hoker.lib_utils.domain.OperationResult.Failure -> {
                             handleError(hostResult.exception)
                         }
                     }
@@ -417,48 +397,16 @@ class VivoKeyReaderViewModel @Inject constructor(
         }
     }
 
-    fun onScanPressed() {
-        _compartment3State.value = CompartmentState.SCAN_ANIM
-        _compartment2State.value = CompartmentState.HOST_STATUS
-    }
-
-    fun onSelectHostPressed() {
-        _compartment3State.value = CompartmentState.BUTTONS
-        _compartment2State.value = CompartmentState.PAIRED_DEVICE_LIST
-    }
-
-    override fun onTagScan(tag: Tag) {
-        if(_selectedDevice.value == null) {
-            return
-        }
-
-        nfcController = nfcControllerFactory.getController(tag)
-        nfcController?.startConnectionCheckJob()
-        observeNfcConnectionStatus()
-
-        viewModelScope.launch(Dispatchers.IO) {
-            connectionMutex.withLock {
-                startColorAnimation()
-                _compartment3State.value = CompartmentState.MESSAGES
-                attemptBluetoothConnection()
-                nfcController?.connect(tag)
-            }
-        }
-    }
-
     private fun observeNfcConnectionStatus() {
-        nfcController?.let { controller ->
+        _nfcController?.let { controller ->
             viewModelScope.launch {
                 controller.connectionStatus
                     .debounce(1000)
                     .collect { status ->
-                    connectionMutex.withLock {
-                        if (status == ConnectionStatus.DISCONNECTED) {
-                            stopColorAnimation()
+                        if (!status) {
                             killConnections()
                         }
                     }
-                }
             }
         }
     }
@@ -470,22 +418,32 @@ class VivoKeyReaderViewModel @Inject constructor(
                 type = MessageType.ERROR
             )
         }
-        killConnections()
+        viewModelScope.launch(Dispatchers.IO) {
+            killConnections()
+        }
     }
 
     fun onBack() {
         if(_selectedDevice.value != null) {
-            nfcController = null
+            _nfcController = null
             _messageLog.value = listOf()
-            stopColorAnimation()
             _selectedDevice.value = null
             bluetoothController.killConnection()
-            onSelectHostPressed()
         }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        nfcController?.cancelConnectionCheckJob()
+    override fun onNfcTagDiscovered(tag: Tag, nfcController: NfcController) {
+        if(_selectedDevice.value == null) {
+            return
+        }
+
+        _nfcController = nfcController
+        _uid.value = tag.id
+
+        viewModelScope.launch(Dispatchers.IO) {
+            observeNfcConnectionStatus()
+            attemptBluetoothConnection()
+            nfcController.connect(tag)
+        }
     }
 }

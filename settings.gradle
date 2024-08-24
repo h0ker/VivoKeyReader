@@ -6,14 +6,18 @@ pluginManagement {
     }
 }
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://jitpack.io' }
+        flatDir {
+            dirs 'libs'
+        }
     }
 }
 rootProject.name = "VivoKeyReader"
 include ':app'
 include ':lib-bluetooth'
-include ':lib-nfc'
+//include ':lib-nfc'
 include ':lib-utils'

@@ -1,6 +1,5 @@
 package com.vivokey.vivokeyreader.presentation.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.Card
 import androidx.compose.material.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
@@ -32,14 +32,14 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun Messages(
+    modifier: Modifier = Modifier,
     messageLog: List<Message?>
 ) {
-
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
     LazyColumn(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         state = listState
@@ -81,12 +81,8 @@ fun SentMessage(bytes: ByteArray?) {
         horizontalArrangement = Arrangement.End
     ) {
         Card(
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(
-                width = 2.dp,
-                color = Color.Black
-            ),
-            backgroundColor = Color.Green
+            shape = RoundedCornerShape(16.dp),
+            backgroundColor = MaterialTheme.colorScheme.tertiary
         ) {
             SelectionContainer {
                 Text(
@@ -109,15 +105,11 @@ fun ReceivedMessage(bytes: ByteArray?) {
     ) {
         Text(
             text = if(bytes?.size == 1) "CTL" else "APDU",
-            color = Color.Black
+            color = MaterialTheme.colorScheme.primary
         )
         Card(
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(
-                width = 2.dp,
-                color = Color.Black
-            ),
-            backgroundColor = Color.Cyan
+            shape = RoundedCornerShape(16.dp),
+            backgroundColor = MaterialTheme.colorScheme.secondary
         ) {
             SelectionContainer {
                 Text(
@@ -141,15 +133,12 @@ fun ErrorMessage(
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "EXCEPTION"
+            text = "EXCEPTION",
+            color = MaterialTheme.colorScheme.primary
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(
-                width = 2.dp,
-                color = Color.Black
-            ),
+            shape = RoundedCornerShape(16.dp),
             backgroundColor = Color.Red
         ) {
             Row {

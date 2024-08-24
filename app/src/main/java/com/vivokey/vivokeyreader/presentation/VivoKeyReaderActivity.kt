@@ -3,7 +3,6 @@ package com.vivokey.vivokeyreader.presentation
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
-import android.nfc.Tag
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -13,8 +12,7 @@ import androidx.core.view.WindowCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.vivokey.lib_nfc.domain.NfcActivity
-import com.vivokey.lib_nfc.domain.NfcViewModel
+import com.carbidecowboy.intra.domain.NfcActivity
 import com.vivokey.vivokeyreader.domain.NavRoutes
 import com.vivokey.vivokeyreader.ui.theme.VivoKeyReaderTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -81,13 +79,6 @@ class VivoKeyReaderActivity : NfcActivity() {
                     }
                 }
             }
-        }
-    }
-
-    override fun onTagDiscovered(tag: Tag?) {
-        super.onTagDiscovered(tag)
-        tag?.let {
-            (viewModel as NfcViewModel).onTagScan(tag)
         }
     }
 

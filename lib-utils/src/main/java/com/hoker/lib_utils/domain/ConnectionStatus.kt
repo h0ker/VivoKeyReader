@@ -1,7 +1,7 @@
 package com.hoker.lib_utils.domain
 
-enum class ConnectionStatus {
-    CONNECTED,
-    DISCONNECTED,
-    CONNECTING
+enum class ConnectionStatus(val textStatus: String) {
+    CONNECTED("Connected"),
+    DISCONNECTED("Disconnected"),
+    CONNECTING("Connecting")
 }
