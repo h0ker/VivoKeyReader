@@ -1,6 +1,7 @@
 buildscript {
     ext {
-        application_version_name = '0.0.4'
+        application_version_name = '0.0.5'
+        application_version_code = 0005
         compose_version = '1.6.7'
         lifecycle_viewmodel_compose_version = '2.8.0'
         navigation_compose_version = '2.7.7'
@@ -27,7 +28,7 @@ buildscript {
 }
 
 plugins {
-    id 'com.android.application' version '8.5.1' apply false
-    id 'com.android.library' version '8.5.1' apply false
+    id 'com.android.application' version '8.6.0' apply false
+    id 'com.android.library' version '8.6.0' apply false
     id 'org.jetbrains.kotlin.android' version '1.9.24' apply false
 }
